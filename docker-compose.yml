@@ -1,0 +1,77 @@
+version: '2'
+services:
+
+  hydra-migrate:
+    image: oryd/hydra:$HYDRA_VERSION
+    links:
+      - postgresd:postgresd
+    environment:
+      - LOG_LEVEL=debug
+      - HYDRA_SYSTEM_SECRET=uUp6PYA0IrqWDL9Ky4z9nFl7
+    command:
+      migrate sql postgres://dbuser:e1gGkSU3XZt4a@postgresd:5432/accesscontroldb?sslmode=disable
+    restart: on-failure
+
+  postgresd:
+    image: postgres:9.6
+    environment:
+      - POSTGRES_USER=dbuser
+      - POSTGRES_PASSWORD=e1gGkSU3XZt4a
+      - POSTGRES_DB=accesscontroldb
+
+  hydra:
+    image: oryd/hydra:$HYDRA_VERSION
+    ports:
+      - '4444:4444'
+      - '4445:4445'
+    command: serve all --dangerous-force-http
+    depends_on:
+      - hydra-migrate
+    environment:
+      - LOG_LEVEL=debug
+      - SYSTEM_SECRET=uUp6PYA0IrqWDL9Ky4z9nFl7
+      - DATABASE_URL=postgres://dbuser:e1gGkSU3XZt4a@postgresd:5432/accesscontroldb?sslmode=disable
+      - OAUTH2_CONSENT_URL=http://localhost:5100/consent
+      - OAUTH2_LOGIN_URL=http://localhost:5100/login
+      - OAUTH2_ISSUER_URL=http://localhost:4444
+      - OAUTH2_SHARE_ERROR_DEBUG=1
+      - ISSUER_URL=http://localhost:4444
+    restart: on-failure
+
+  configurator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - HYDRA_VERSION=$HYDRA_VERSION
+        - KETO_VERSION=$KETO_VERSION
+        - OATHKEEPER_VERSION=$OATHKEEPER_VERSION
+    depends_on:
+      - hydra
+    volumes:
+      - ./scripts:/scripts
+    environment:
+      # All of these URLs MUST NOT end with a trailing slash. This is very important!
+      - HYDRA_URL=http://hydra:4444
+      - HYDRA_ADMIN_URL=http://hydra:4445
+      - KETO_URL=http://keto:4466
+      - RESOURCE_SERVER_URL=http://resource-server:4478
+      - OATHKEEPER_API_URL=http://oathkeeper-api:4456
+      - OATHKEEPER_PROXY_URL=http://oathkeeper-proxy:4455
+
+      # This sets the prefix for all resource, action, and subject names. Be aware that this prefix is automatically
+      # applied to all OAuth2 Clients as well.
+      - "HYDRA_SUBJECT_PREFIX=subjects:hydra:"
+      - "HYDRA_RESOURCE_PREFIX=resources:hydra:"
+      - "HYDRA_ACTION_PREFIX=actions:hydra:"
+      - "OATHKEEPER_RESOURCE_PREFIX=resources:oathkeeper:"
+      - "OATHKEEPER_ACTION_PREFIX=actions:oathkeeper:"
+      - "KETO_RESOURCE_PREFIX=resources:keto:"
+      - "KETO_ACTION_PREFIX=actions:keto:"
+
+      - OATHKEEPER_HYDRA_JWK_SET_ID=jwk:oathkeeper
+      - OATHKEEPER_HYDRA_CLIENT_ID=clients:oathkeeper-client
+      - OATHKEEPER_HYDRA_CLIENT_SECRET=dummy-oathkeeper-secret
+      - KETO_HYDRA_CLIENT_ID=clients:keto-client
+      - KETO_HYDRA_CLIENT_SECRET=dummy-keto-secret
+    restart: on-failure

@@ -1,0 +1,19 @@
+{
+  "client_id": "hpn-server",
+  "description": "This client will be used by the exemplary consumer application.",
+  "client_secret": "hpn-secret",
+  "scope": "openid offline articles.read",
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "response_types": [
+    "code",
+    "id_token"
+  ],
+  "token_endpoint_auth_method": "client_secret_post",
+  "redirect_uris": [
+    "http://localhost:3000/auth/callback",
+    "http://127.0.0.1:3000/auth/callback"
+  ]
+}
